@@ -3,8 +3,11 @@ import datetime
 import pytz
 
 def mask_account_number(account_number):
-    """Маскирует номер счета"""
-    return f"**{account_number[-4:]}"
+    if len(account_number) >= 4:
+        return '**' + account_number[-4:]
+    else:
+        return '**' + account_number[-1:]
+
 
 def extract_card_number(description, from_, masked=False):
     """Извлекает номер карты или номер счета из описания операции"""
@@ -30,7 +33,7 @@ def extract_card_number(description, from_, masked=False):
 
 def mask_card_number(card_number):
     """Маскирует номер карты"""
-    return f"{card_number[:2]}** **** **** {card_number[-4:]}"
+    return f"{card_number[:4]} {card_number[4:6]}** {'*' * 4} {card_number[-4:]}"
 
 def print_last_operations():
     """Выводит информацию о последних 5 выполненных операциях"""
