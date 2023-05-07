@@ -1,39 +1,56 @@
 import json
 import datetime
 import pytz
+import re
 
 def mask_account_number(account_number):
-    if len(account_number) >= 4:
+    if account_number is None:
+        return None
+    elif len(account_number) >= 4:
         return '**' + account_number[-4:]
     else:
         return '**' + account_number[-1:]
 
-
 def extract_card_number(description, from_, masked=False):
     """Извлекает номер карты или номер счета из описания операции"""
-    card_number = from_.replace("Maestro ", "").replace("Visa Classic ", "")
-    for i in range(len(card_number)):
-        if not card_number[i].isdigit():
-            card_number = card_number[:i]
-            break
-    if "счет" in from_.lower():
-        account_number = from_.replace('Счет ', '').replace('счет ', '')
-        card_number = f'**{account_number[-4:]}'
-    elif masked:
-        card_number = f"{card_number[:4]} {card_number[4:6]}** {'*' * 4} {card_number[-4:]}"
-    else:
-        card_number = f"{card_number[:4]} {card_number[4:5]} {card_number[6:11].replace(card_number[6:11], '*'*4)} {card_number[-4:]}"
-    if "Maestro" in from_:
-        return f"Maestro {card_number}"
-    elif "Visa Classic" in from_:
-        return f"Visa Classic {card_number}"
+    if "Maestro" in from_ or "Visa Classic" in from_:
+        card_number = from_.replace("Maestro ", "").replace("Visa Classic ", "")
+        for i in range(len(card_number)):
+            if not card_number[i].isdigit():
+                card_number = card_number[:i]
+                break
+        if masked:
+            card_number = mask_card_number(card_number)
+        else:
+            card_number = f"{card_number[:4]} {card_number[4:5]} {card_number[6:11].replace(card_number[6:11], '*'*4)} {card_number[-4:]}"
+        if "Maestro" in from_:
+            return f"Maestro {card_number}"
+        elif "Visa Classic" in from_:
+            return f"Visa Classic {card_number}"
     elif "Счет" in from_:
-        return f"Счёт {mask_account_number(card_number)}"
+        account_number = from_.replace('Счет ', '').replace('счет ', '')
+        if masked:
+            card_number = mask_account_number(account_number)
+        else:
+            card_number = f"**{account_number[-4:]}"
+        return f"Счёт {card_number}"
+    else:
+        return None
 
 
 def mask_card_number(card_number):
     """Маскирует номер карты"""
+    def mask_card_number(card_number):
+        """Маскирует номер карты"""
+    if card_number is None:
+        raise TypeError("Invalid input type. Expecting a string.")
+    if not isinstance(card_number, str):
+        raise TypeError("Invalid input type. Expecting a string.")
+    if not card_number.isdigit() or len(card_number) != 16:
+        raise ValueError("Invalid card number format. Expecting a 16-digit numeric string.")
     return f"{card_number[:4]} {card_number[4:6]}** {'*' * 4} {card_number[-4:]}"
+
+
 
 def print_last_operations():
     """Выводит информацию о последних 5 выполненных операциях"""
@@ -50,13 +67,17 @@ def print_last_operations():
         from_ = op.get('from', '')
         to = op['to']
         amount, currency = op['operationAmount']['amount'], op['operationAmount']['currency']
-        masked_from = mask_card_number(from_) if 'Maestro' in from_ or 'Visa' in from_ else mask_account_number(from_)
+        if "Maestro" in from_ or "Visa Classic" in from_ or "Счет" in from_.lower():
+            card_number = extract_card_number(description, from_, masked=True)
+        else:
+            card_number = extract_card_number(description, from_)
         masked_to = mask_account_number(to)
         if not from_:
             masked_from = mask_account_number(to)
-        card_number = extract_card_number(description, from_, masked=True)
+        else:
+            masked_from = card_number
         print(f"{date.strftime('%d.%m.%Y')} {description}")
-        print(f"{card_number} -> {masked_to}")
+        print(f"{masked_from} -> {masked_to}")
         print(f"{amount} {currency['name']}\n")
 
 if __name__ == '__main__':
